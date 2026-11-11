@@ -109,6 +109,23 @@ test('备注、未核对标记、没有候选时的版式', () => {
   assert.match(doc, /## 备注\n\nB 站检索失败：风控\n$/)
 })
 
+test('综合结论和备注是模型写的：逐行转义，不能往文档里塞链接或图片', () => {
+  const { picks } = resolvePicks([{ url: B1.url, reason: 'r' }], candidates())
+  const doc = renderReport({
+    keyword: 'k',
+    summary: '第一段。\n\n第二段 [点这里](https://evil.example) ![x](https://evil.example/a.png)',
+    notes: '<script>alert(1)</script>',
+    picks,
+    candidates: candidates(),
+    date: new Date(2026, 0, 2),
+  })
+  assert.match(doc, /## 综合结论\n\n第一段。\n\n第二段 \\\[点这里\\\]\(https:\/\/evil\.example\) !\\\[x\\\]/)
+  assert.match(doc, /## 备注\n\n\\<script\\>alert\(1\)\\<\/script\\>\n$/)
+  // 文档里真正的 Markdown 链接只有代码生成的视频链接
+  const links = [...doc.matchAll(/(?<!\\)\]\((https?:[^)]+)\)/g)].map((m) => m[1])
+  assert.ok(links.length > 0 && links.every((url) => /^https:\/\/www\.(bilibili\.com\/video\/|youtube\.com\/watch\?v=)/.test(url)))
+})
+
 test('文件名只保留文字和数字，带时间戳', () => {
   const date = new Date(2026, 10, 11, 19, 30, 5)
   assert.equal(reportFileName('机器学习 入门/教程?', date), '机器学习-入门-教程-20261111-193005.md')

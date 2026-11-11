@@ -156,14 +156,14 @@ sequenceDiagram
 
 | 验证 | 怎么跑 | 覆盖 |
 | --- | --- | --- |
-| 单元测试 | `npm test` | 38 个用例，离线。WBI 签名（对官方样例）、两个平台的结果解析、各种失败路径、文档渲染、链接核对 |
+| 单元测试 | `npm test` | 39 个用例，离线。WBI 签名（对官方样例）、两个平台的结果解析、各种失败路径、文档渲染、链接核对 |
 | 端到端测试 | `npm run e2e` | 在**真实的 DSH 0.2.2-rc.1** 里：全新安装 → 启动 → 用浏览器选预设、发关键词 → 检查派出了 2 个子 Agent、三个 Agent 工具各不相同、文档里的链接来自检索记录、文档作为交付物出现在对话里 |
 | 真实站点 | `E2E_REAL_SITES=1 npm run e2e`<br/>`node bin/video-scout.mjs both 机器学习` | 检索工具访问真实的 B 站和 YouTube |
-| 真实模型 | `E2E_REAL_MODEL=1 E2E_REAL_SITES=1 DEEPSEEK_API_KEY=… npm run e2e` | 用 DeepSeek-V4.1-Flash 完整跑了 4 次（3 次「机器学习入门」，1 次英文关键词「how transformers work」），都成功 |
+| 真实模型 | `E2E_REAL_MODEL=1 E2E_REAL_SITES=1 DEEPSEEK_API_KEY=… npm run e2e` | 用 DeepSeek-V4.1-Flash 完整跑了 5 次（3 次「机器学习入门」，另两次是「how transformers work」和「尤克里里入门教学」），都成功 |
 
 默认的端到端测试里，模型是一个照着人设演的脚本（[`test/e2e/fake-llm.mjs`](test/e2e/fake-llm.mjs)），所以不需要 API Key、结果可复现。它证明的是插件和 DSH 的对接没问题，不代表真实模型的表现。
 
-真实模型的 4 次运行里，从会话日志看行为一致：管理 Agent 在同一步里同时调用两个委派工具；每个检索 Agent 检索 1–2 次，再挑出 5 个汇报（汇报数量从第 2 次运行起才有记录）；管理 Agent 等两份汇报到齐后推荐 2 个，调用 `save_video_report` 和 `present` 各一次，没有工具报错。界面显示的用量：管理 Agent 的会话每次约 2.7–2.8 万 token，两个子 Agent 各 5 千左右。4 次不算多，换别的模型或关键词时表现可能不同。
+真实模型的 5 次运行里，从会话日志看行为一致：管理 Agent 在同一步里同时调用两个委派工具；每个检索 Agent 检索 1–2 次，再挑出 5 个汇报（汇报数量从第 2 次运行起才有记录）；管理 Agent 等两份汇报到齐后推荐 2 个，调用 `save_video_report` 和 `present` 各一次，没有工具报错。界面显示的用量：管理 Agent 的会话每次约 2.7–2.8 万 token，两个子 Agent 各 5 千左右。5 次不算多，换别的模型或关键词时表现可能不同。
 
 本地目录、`npm pack` 的压缩包、`github:` 三种安装方式都用端到端测试跑通过。
 
