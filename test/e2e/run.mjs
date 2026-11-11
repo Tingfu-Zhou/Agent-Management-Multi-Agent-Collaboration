@@ -16,6 +16,8 @@
  *   DSH_BIN           dsh 可执行文件的路径（默认用 PATH 里的 dsh）
  *   E2E_PLUGIN_SPEC   传给 dsh plugin add 的安装来源（默认是本仓库目录；可以换成 npm pack 出来的 .tgz 或 github:用户/仓库）
  *   E2E_REAL_SITES=1  检索工具访问真实的 B 站 / YouTube（模型仍然是假的），用来验证本机网络下工具可用
+ *   E2E_REAL_MODEL=1  用真实的 DeepSeek 模型（需要 DEEPSEEK_API_KEY），看三个 Agent 在真模型下的实际表现；
+ *                     这时结果不固定，只检查「生成了文档、推荐了 1–2 个、链接都对得上检索记录」
  *   E2E_KEYWORD       关键词（默认「机器学习入门」）
  *   E2E_SHOTS         截图输出目录（默认不截图）
  *   E2E_KEEP=1        结束后保留临时目录，方便排查
@@ -34,6 +36,11 @@ const REPO = fileURLToPath(new URL('../..', import.meta.url))
 const DSH = process.env.DSH_BIN || 'dsh'
 const KEYWORD = process.env.E2E_KEYWORD || '机器学习入门'
 const REAL_SITES = process.env.E2E_REAL_SITES === '1'
+const REAL_MODEL = process.env.E2E_REAL_MODEL === '1'
+if (REAL_MODEL && !process.env.DEEPSEEK_API_KEY) {
+  console.error('E2E_REAL_MODEL=1 需要同时设置 DEEPSEEK_API_KEY')
+  process.exit(2)
+}
 const step = (message) => console.log(`\n▶ ${message}`)
 const ok = (message) => console.log(`  ✓ ${message}`)
 
@@ -65,15 +72,15 @@ let failed = false
 let page // 失败时用来截图
 
 try {
-  step('启动假模型和假视频站')
+  step('准备模型和视频站')
   const llm = await startFakeLlm()
   const sites = await startFakeSites()
   cleanups.push(() => llm.close(), () => sites.close())
   const env = {
     ...process.env,
     DSH_HOME: path.join(work, 'dsh-home'),
-    DEEPSEEK_API_KEY: 'fake-key-for-e2e',
-    DEEPSEEK_BASE_URL: llm.baseUrl,
+    // 默认把 DSH 的 DeepSeek 适配器指向假模型；E2E_REAL_MODEL=1 时用环境里的 Key 访问真实接口
+    ...(REAL_MODEL ? {} : { DEEPSEEK_API_KEY: 'fake-key-for-e2e', DEEPSEEK_BASE_URL: llm.baseUrl }),
     DSH_TELEMETRY_MODE: 'DISABLED',
     // 检索工具默认指向假视频站；E2E_REAL_SITES=1 时不覆盖，走真实站点
     ...(REAL_SITES ? {} : { VIDEO_SCOUT_BILIBILI_API: sites.url, VIDEO_SCOUT_YOUTUBE_ORIGIN: sites.url }),
@@ -85,7 +92,8 @@ try {
     delete env.BILIBILI_COOKIE
     delete env.YOUTUBE_API_KEY
   }
-  ok(`假模型 ${llm.baseUrl}，${REAL_SITES ? '真实的 B 站 / YouTube' : `假视频站 ${sites.url}`}`)
+  if (REAL_MODEL) delete env.DEEPSEEK_BASE_URL
+  ok(`${REAL_MODEL ? '真实的 DeepSeek 模型' : `假模型 ${llm.baseUrl}`}，${REAL_SITES ? '真实的 B 站 / YouTube' : `假视频站 ${sites.url}`}`)
 
   step('把插件装进一个全新的 DSH（dsh plugin --profile web add）')
   const version = (await run(DSH, ['--version'], { env })).trim()
@@ -161,33 +169,52 @@ try {
   await page.locator('[contenteditable=true]').first().click()
   await page.keyboard.type(KEYWORD)
   await page.getByRole('button', { name: '发送消息' }).click()
-  // 假模型在成功时会说「完整的推荐文档已保存」；其他结局（检索失败、保存失败）直接把对话内容报出来
-  await page.getByText('完整的推荐文档已保存').waitFor({ timeout: 180_000 }).catch(async () => {
-    const text = await page.evaluate(() => document.body.innerText)
-    throw new Error(`没有等到最终答复。界面内容：\n${text.slice(-1500)}`)
-  })
-  await page.waitForTimeout(1500) // 等交付卡片渲染出来
+  const bodyText = () => page.evaluate(() => document.body.innerText)
+  const giveUp = async (what) => { throw new Error(`${what}。界面内容：\n${(await bodyText()).slice(-2000)}`) }
+  if (REAL_MODEL) {
+    // 真模型的措辞不固定：等文档落盘，再等界面内容稳定下来（连续 8 秒不再变化）就算这一轮结束
+    const reportDir = path.join(workspace, 'video-scout')
+    const deadline = Date.now() + 10 * 60_000
+    let files = []
+    while (!files.length) {
+      if (Date.now() > deadline) await giveUp('10 分钟内没有生成文档')
+      await page.waitForTimeout(3000)
+      files = await readdir(reportDir).catch(() => [])
+    }
+    for (let previous = '', stableSince = Date.now(); ;) {
+      await page.waitForTimeout(2000)
+      const current = await bodyText()
+      if (current !== previous) { previous = current; stableSince = Date.now() }
+      else if (Date.now() - stableSince >= 8000 && current.includes(files[0])) break
+      if (Date.now() > deadline) await giveUp('文档已生成，但管理 Agent 一直没有收尾')
+    }
+  } else {
+    // 假模型在成功时会说「完整的推荐文档已保存」；其他结局（检索失败、保存失败）直接把对话内容报出来
+    await page.getByText('完整的推荐文档已保存').waitFor({ timeout: 180_000 }).catch(() => giveUp('没有等到最终答复'))
+    await page.waitForTimeout(1500) // 等交付卡片渲染出来
+  }
   await shot('2-result')
-  const body = await page.evaluate(() => document.body.innerText)
+  const body = await bodyText()
   ok('管理 Agent 给出了最终答复')
 
   step('检查结果')
   assert.match(body, /2 个子智能体/, '界面应显示管理 Agent 派出了 2 个子智能体')
   ok('界面显示「2 个子智能体」')
 
-  const toolsets = llm.requests.map((request) => (request.body.tools ?? []).map((tool) => tool.name))
-  const seen = (name) => toolsets.some((tools) => tools.includes(name))
-  const manager = toolsets.find((tools) => tools.includes('bilibili_agent'))
-  assert.ok(manager, '管理 Agent 应当向模型发过请求')
-  for (const tool of ['bilibili_agent', 'youtube_agent', 'save_video_report', 'present']) assert.ok(manager.includes(tool), `管理 Agent 缺少工具 ${tool}`)
-  assert.ok(!manager.includes('bilibili_search') && !manager.includes('youtube_search'), '管理 Agent 不应该直接拥有检索工具')
-  const biliAgent = toolsets.find((tools) => tools.includes('bilibili_search'))
-  const tubeAgent = toolsets.find((tools) => tools.includes('youtube_search'))
-  assert.ok(biliAgent && tubeAgent, '两个检索 Agent 都应当向模型发过请求')
-  assert.ok(!biliAgent.includes('youtube_search') && !tubeAgent.includes('bilibili_search'), '两个检索 Agent 各自只有自己平台的检索工具')
-  assert.ok(![biliAgent, tubeAgent].some((tools) => tools.includes('bilibili_agent') || tools.includes('save_video_report')), '检索 Agent 不应该有管理 Agent 的工具')
-  assert.ok(seen('present'))
-  ok(`三个 Agent 的工具各不相同：管理 [${manager.join(', ')}]；B 站 [${biliAgent.join(', ')}]；YouTube [${tubeAgent.join(', ')}]`)
+  if (!REAL_MODEL) {
+    // 假模型记录了 DSH 发来的每个请求，可以看到每个 Agent 实际拿到了哪些工具
+    const toolsets = llm.requests.map((request) => (request.body.tools ?? []).map((tool) => tool.name))
+    const manager = toolsets.find((tools) => tools.includes('bilibili_agent'))
+    assert.ok(manager, '管理 Agent 应当向模型发过请求')
+    for (const tool of ['bilibili_agent', 'youtube_agent', 'save_video_report', 'present']) assert.ok(manager.includes(tool), `管理 Agent 缺少工具 ${tool}`)
+    assert.ok(!manager.includes('bilibili_search') && !manager.includes('youtube_search'), '管理 Agent 不应该直接拥有检索工具')
+    const biliAgent = toolsets.find((tools) => tools.includes('bilibili_search'))
+    const tubeAgent = toolsets.find((tools) => tools.includes('youtube_search'))
+    assert.ok(biliAgent && tubeAgent, '两个检索 Agent 都应当向模型发过请求')
+    assert.ok(!biliAgent.includes('youtube_search') && !tubeAgent.includes('bilibili_search'), '两个检索 Agent 各自只有自己平台的检索工具')
+    assert.ok(![biliAgent, tubeAgent].some((tools) => tools.includes('bilibili_agent') || tools.includes('save_video_report')), '检索 Agent 不应该有管理 Agent 的工具')
+    ok(`三个 Agent 的工具各不相同：管理 [${manager.join(', ')}]；B 站 [${biliAgent.join(', ')}]；YouTube [${tubeAgent.join(', ')}]`)
+  }
 
   if (!REAL_SITES) {
     assert.ok(sites.hits.some((hit) => hit.endsWith('/x/web-interface/wbi/search/type')), 'B 站检索工具应当请求过搜索接口')
@@ -198,19 +225,25 @@ try {
   const reports = await readdir(path.join(workspace, 'video-scout'))
   assert.equal(reports.length, 1, '应当生成一份文档')
   const report = await readFile(path.join(workspace, 'video-scout', reports[0]), 'utf8')
-  assert.match(report, new RegExp(`^# 「${KEYWORD}」视频推荐`))
-  assert.match(report, /### 1\. \[.+\]\(https:\/\/www\.bilibili\.com\/video\/BV[0-9A-Za-z]{10}\)/)
-  assert.match(report, /### 2\. \[.+\]\(https:\/\/www\.youtube\.com\/watch\?v=[\w-]{11}\)/)
-  assert.match(report, /从哔哩哔哩 \d+ 个、YouTube \d+ 个候选里精选出 2 个/)
+  if (process.env.E2E_SHOTS) await writeFile(path.join(process.env.E2E_SHOTS, 'report.md'), report)
+  assert.match(report, /^# 「.+」视频推荐/)
+  const picks = [...report.matchAll(/^### \d+\. \[.+\]\((https:\/\/www\.(?:bilibili\.com\/video\/BV[0-9A-Za-z]{10}|youtube\.com\/watch\?v=[\w-]{11}))\)$/gm)].map((match) => match[1])
+  assert.ok(picks.length >= 1 && picks.length <= 2, `文档应当推荐 1–2 个视频，实际 ${picks.length} 个`)
+  assert.match(report, /从哔哩哔哩 \d+ 个、YouTube \d+ 个候选里精选出 [12] 个/)
   assert.ok(!report.includes('没有对上检索记录'), '子 Agent 的检索记录应当能被管理 Agent 的写文档工具查到')
-  if (!REAL_SITES) {
+  if (!REAL_MODEL) {
+    // 假模型固定各取一个：第 1 个来自 B 站，第 2 个来自 YouTube
+    assert.equal(picks.length, 2)
+    assert.match(picks[0], /bilibili\.com/)
+    assert.match(picks[1], /youtube\.com/)
+  }
+  if (!REAL_SITES && !REAL_MODEL) {
     // 假视频站的内容是固定的，可以精确核对标题与链接
     assert.match(report, /### 1\. \[【机器学习】动手学深度学习 \\\| 00 预告 & 课程安排\]\(https:\/\/www\.bilibili\.com\/video\/BV1if4y147hS\)/)
     assert.match(report, /### 2\. \[But what is a neural network\? \\\| Deep learning chapter 1\]\(https:\/\/www\.youtube\.com\/watch\?v=aircAruvnKk\)/)
     assert.match(report, /从哔哩哔哩 5 个、YouTube 5 个候选里精选出 2 个/)
   }
-  ok(`文档 ${reports[0]}：两个推荐的标题、链接都来自检索记录，并附全部候选的对照表`)
-  if (process.env.E2E_SHOTS) await writeFile(path.join(process.env.E2E_SHOTS, 'report.md'), report)
+  ok(`文档 ${reports[0]}：推荐了 ${picks.length} 个视频，标题、链接都来自检索记录，并附全部候选的对照表`)
 
   assert.ok(body.includes(reports[0]), '文档应当作为交付物出现在界面上')
   ok('文档作为交付物出现在对话里')
