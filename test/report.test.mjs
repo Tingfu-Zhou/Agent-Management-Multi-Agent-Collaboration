@@ -64,7 +64,7 @@ test('渲染出的文档包含推荐、链接、理由和全部候选对照表',
 
   assert.match(doc, /^# 「机器学习」视频推荐\n/)
   assert.match(doc, /由 Video Scout 多 Agent 协作生成 · 2026-11-11 19:30/)
-  assert.match(doc, /从 哔哩哔哩 2 个、YouTube 1 个候选里精选出 2 个/)
+  assert.match(doc, /从哔哩哔哩 2 个、YouTube 1 个候选里精选出 2 个/)
   assert.match(doc, /## 综合结论\n\nB 站偏系统课程，YouTube 偏直观讲解。/)
   assert.match(doc, /### 1\. \[But what is a neural network\?\]\(https:\/\/www\.youtube\.com\/watch\?v=aircAruvnKk\)/)
   assert.match(doc, /- \*\*平台\*\*：YouTube\n- \*\*作者\*\*：3Blue1Brown\n- \*\*数据\*\*：播放 2134\.6万 · 时长 18:40 · 发布 8年前\n- \*\*推荐理由\*\*：动画直观，适合入门\n- \*\*链接\*\*：<https:\/\/www\.youtube\.com\/watch\?v=aircAruvnKk>/)

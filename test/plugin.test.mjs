@@ -57,6 +57,8 @@ test('三个入口都按 DSH 插件的形状导出，各注册一个工具', () 
     plugin.apply(host.ctx, undefined)
   }
   assert.deepEqual([...host.tools.keys()], ['bilibili_search', 'youtube_search', 'save_video_report'])
+  assert.deepEqual(host.tools.get('bilibili_search').parameters.properties.order.enum, ['relevance', 'views', 'newest'])
+  assert.deepEqual(host.tools.get('youtube_search').parameters.properties.order.enum, ['relevance', 'views'])
   for (const tool of host.tools.values()) {
     assert.equal(tool.parameters.type, 'object')
     assert.equal(tool.parameters.additionalProperties, false)

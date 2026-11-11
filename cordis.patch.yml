@@ -23,7 +23,7 @@
       config:
         id: video-scout
         name: 视频侦察 Video Scout
-        description: 多 Agent 协作找视频。输入一个关键词，管理 Agent 会把任务分派给 B 站、YouTube 两个检索 Agent，再汇总出 1–2 个最值得看的视频，生成带链接的推荐文档。
+        description: 多 Agent 协作找视频。输入关键词，管理 Agent 分派 B 站、YouTube 两个检索 Agent，再汇总出 1–2 个推荐，生成带链接的文档。
         order: 60
         plugins:
           - id: persona
@@ -85,7 +85,7 @@
       config:
         id: video-scout-bilibili
         name: B 站检索 Agent
-        description: Video Scout 的子 Agent，只会在哔哩哔哩按关键词检索视频。通常由「视频侦察」管理 Agent 调用，也可以单独使用。
+        description: 「视频侦察」的子 Agent，只会在 B 站按关键词检索视频。一般由管理 Agent 调用，也可单独使用。
         order: 61
         plugins:
           - id: persona
@@ -130,7 +130,7 @@
       config:
         id: video-scout-youtube
         name: YouTube 检索 Agent
-        description: Video Scout 的子 Agent，只会在 YouTube 按关键词检索视频。通常由「视频侦察」管理 Agent 调用，也可以单独使用。
+        description: 「视频侦察」的子 Agent，只会在 YouTube 按关键词检索视频。一般由管理 Agent 调用，也可单独使用。
         order: 62
         plugins:
           - id: persona

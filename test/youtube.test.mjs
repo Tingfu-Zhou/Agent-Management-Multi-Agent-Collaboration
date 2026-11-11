@@ -51,11 +51,18 @@ test('InnerTube 失败时退回解析搜索结果页', async () => {
   const data = fixture('youtube-innertube.json')
   const html = `<html><script>var ytInitialData = ${JSON.stringify(data)};</script><script>var x = "}";</script></html>`
   const fetch = fakeFetch({ '/youtubei/v1/search': () => new Response('nope', { status: 403 }), '/results': html })
-  const result = await searchYouTube('机器学习', { fetch, apiKey: '', limit: 3, order: 'newest' })
+  const result = await searchYouTube('机器学习', { fetch, apiKey: '', limit: 3, order: 'views' })
   assert.equal(result.videos.length, 3)
   const page = new URL(fetch.calls[1].url)
   assert.equal(page.searchParams.get('search_query'), '机器学习')
-  assert.equal(page.searchParams.get('sp'), 'CAISAhAB')
+  assert.equal(page.searchParams.get('sp'), 'CAMSAhAB')
+})
+
+test('免 Key 检索不支持按发布时间排序：退回综合排序，并在结果里如实标明', async () => {
+  const fetch = fakeFetch({ '/youtubei/v1/search': fixture('youtube-innertube.json') })
+  const result = await searchYouTube('x', { fetch, apiKey: '', order: 'newest' })
+  assert.equal(result.order, 'relevance')
+  assert.equal(JSON.parse(fetch.calls[0].body).params, 'EgIQAQ%3D%3D')
 })
 
 test('ytInitialData 的解析能处理字符串里的花括号和转义', () => {
@@ -77,6 +84,9 @@ test('两条路都失败时报错并提示代理 / API Key', async () => {
 test('配了 API Key 就走官方 Data API，并补齐播放量与时长', async () => {
   const fetch = fakeFetch({ '/search?': fixture('youtube-data-search.json'), '/videos?': fixture('youtube-data-videos.json') })
   const result = await searchYouTube('machine learning', { fetch, apiKey: 'TEST_KEY', limit: 2, order: 'views' })
+  const newest = await searchYouTube('machine learning', { fetch, apiKey: 'TEST_KEY', order: 'newest' })
+  assert.equal(newest.order, 'newest')
+  assert.equal(new URL(fetch.calls[2].url).searchParams.get('order'), 'date', 'Data API 支持按发布时间排序')
 
   assert.equal(result.via, 'data-api')
   const search = new URL(fetch.calls[0].url)
