@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "视频侦察 Video Scout",
+    "description": "多 Agent 协作找视频：管理 Agent 把关键词分派给 B 站、YouTube 两个检索 Agent，再汇总出 1–2 个最值得看的视频，生成带链接的推荐文档。"
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Video Scout",
+    "description": "Multi-agent video search: a manager agent delegates your keyword to Bilibili and YouTube search agents, then picks the best 1–2 videos and writes a linked recommendation doc."
+  }
+}

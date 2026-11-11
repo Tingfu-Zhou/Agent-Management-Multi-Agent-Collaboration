@@ -1,0 +1,53 @@
+{
+  "name": "dsh-video-scout",
+  "version": "0.1.0",
+  "description": "多 Agent 协作找视频：一个管理 Agent 把关键词分派给 B 站、YouTube 两个检索 Agent，再汇总出 1–2 个最值得看的视频，生成带链接的推荐文档。A manager agent delegates a keyword to Bilibili and YouTube search agents, then writes a linked recommendation doc.",
+  "icon": "./icon.svg",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "multi-agent",
+    "subagent",
+    "bilibili",
+    "youtube"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Tingfu-Zhou/Agent-Management-Multi-Agent-Collaboration.git"
+  },
+  "homepage": "https://github.com/Tingfu-Zhou/Agent-Management-Multi-Agent-Collaboration#readme",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./bilibili": "./lib/bilibili.js",
+    "./youtube": "./lib/youtube.js",
+    "./report": "./lib/report.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./locale/*.json": "./locale/*.json",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "bin",
+    "locale",
+    "icon.svg",
+    "cordis.patch.yml"
+  ],
+  "engines": {
+    "node": ">=20.3",
+    "dsh": ">=0.2.2-rc.1 <0.3.0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "search": "node bin/video-scout.mjs",
+    "e2e": "node test/e2e/run.mjs"
+  }
+}

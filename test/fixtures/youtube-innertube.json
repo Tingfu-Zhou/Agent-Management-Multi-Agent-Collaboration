@@ -1,0 +1,102 @@
+{
+  "responseContext": { "visitorData": "test" },
+  "estimatedResults": "1234567",
+  "contents": {
+    "twoColumnSearchResultsRenderer": {
+      "primaryContents": {
+        "sectionListRenderer": {
+          "contents": [
+            {
+              "itemSectionRenderer": {
+                "contents": [
+                  { "adSlotRenderer": { "adSlotMetadata": { "slotId": "ad-1" } } },
+                  {
+                    "videoRenderer": {
+                      "videoId": "aircAruvnKk",
+                      "title": { "runs": [ { "text": "But what is a neural network? | Deep learning chapter 1" } ] },
+                      "longBylineText": { "runs": [ { "text": "3Blue1Brown" } ] },
+                      "ownerText": { "runs": [ { "text": "3Blue1Brown" } ] },
+                      "publishedTimeText": { "simpleText": "8年前" },
+                      "lengthText": { "simpleText": "18:40" },
+                      "viewCountText": { "simpleText": "21,345,678次观看" },
+                      "shortViewCountText": { "simpleText": "2134万次观看" },
+                      "detailedMetadataSnippets": [
+                        { "snippetText": { "runs": [ { "text": "What are the neurons, why are there layers, and what is the math underlying it?" } ] } }
+                      ]
+                    }
+                  },
+                  {
+                    "videoRenderer": {
+                      "videoId": "i_LwzRVP7bg",
+                      "title": { "runs": [ { "text": "Machine Learning for Everybody – Full Course" } ] },
+                      "ownerText": { "runs": [ { "text": "freeCodeCamp.org" } ] },
+                      "publishedTimeText": { "simpleText": "4年前" },
+                      "lengthText": { "simpleText": "3:53:53" },
+                      "viewCountText": { "simpleText": "9,876,543次观看" },
+                      "detailedMetadataSnippets": [
+                        { "snippetText": { "runs": [ { "text": "Learn " }, { "text": "Machine Learning", "bold": true }, { "text": " in a way that is accessible to absolute beginners." } ] } }
+                      ]
+                    }
+                  },
+                  { "reelShelfRenderer": { "title": { "simpleText": "Shorts" }, "items": [] } },
+                  {
+                    "shelfRenderer": {
+                      "title": { "simpleText": "People also watched" },
+                      "content": {
+                        "verticalListRenderer": {
+                          "items": [
+                            { "videoRenderer": { "videoId": "SHELFvide01", "title": { "runs": [ { "text": "货架里的视频（不应出现）" } ] } } }
+                          ]
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "videoRenderer": {
+                      "videoId": "ukzFI9rgwfU",
+                      "title": { "runs": [ { "text": "Machine Learning Basics | What Is Machine Learning? | Simplilearn" } ] },
+                      "ownerText": { "runs": [ { "text": "Simplilearn" } ] },
+                      "publishedTimeText": { "simpleText": "7年前" },
+                      "lengthText": { "simpleText": "7:52" },
+                      "viewCountText": { "simpleText": "5,432,109次观看" }
+                    }
+                  },
+                  { "channelRenderer": { "channelId": "UCxxxx", "title": { "simpleText": "Some Channel" } } },
+                  {
+                    "videoRenderer": {
+                      "videoId": "Gv9_4yMHFhI",
+                      "title": { "runs": [ { "text": "吴恩达机器学习 2022 新版 | Machine Learning Specialization" } ] },
+                      "ownerText": { "runs": [ { "text": "DeepLearningAI" } ] },
+                      "publishedTimeText": { "simpleText": "3年前" },
+                      "lengthText": { "simpleText": "1:15:02" },
+                      "viewCountText": { "simpleText": "1.2M views" }
+                    }
+                  },
+                  {
+                    "videoRenderer": {
+                      "videoId": "LIVEstrm00A",
+                      "title": { "runs": [ { "text": "ML study with me (live)" } ] },
+                      "ownerText": { "runs": [ { "text": "Study Channel" } ] },
+                      "viewCountText": { "runs": [ { "text": "321" }, { "text": " 人正在观看" } ] },
+                      "badges": [ { "metadataBadgeRenderer": { "style": "BADGE_STYLE_TYPE_LIVE_NOW", "label": "直播" } } ]
+                    }
+                  },
+                  {
+                    "videoRenderer": {
+                      "videoId": "SIXTHvide06",
+                      "title": { "runs": [ { "text": "第六条结果（用来验证 limit 截断）" } ] },
+                      "ownerText": { "runs": [ { "text": "Sixth" } ] },
+                      "lengthText": { "simpleText": "0:30" },
+                      "viewCountText": { "simpleText": "无人观看" }
+                    }
+                  }
+                ]
+              }
+            },
+            { "continuationItemRenderer": { "trigger": "CONTINUATION_TRIGGER_ON_ITEM_SHOWN" } }
+          ]
+        }
+      }
+    }
+  }
+}
