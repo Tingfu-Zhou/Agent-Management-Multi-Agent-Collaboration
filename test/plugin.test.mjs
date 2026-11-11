@@ -129,6 +129,34 @@ test('不同任务（不同的根 Agent）之间不共享检索记录', () => wi
   assert.match(await readFile(value.path, 'utf8'), /没有对上检索记录/)
 }))
 
+test('没有 rootOf 的宿主版本：顺着会话头的 parentSession 找到同一个任务', () => withSites(async (cwd) => {
+  const host = fakeHost()
+  delete host.services.subagents
+  // 三层：root ← mid ← leaf；mid 已经下线（agents.get 查不到），仍然能归到它记录的父会话
+  const root = { id: 'root-session', cwd, session: { header: {} } }
+  const mid = { id: 'mid-session', session: { header: { parentSession: 'root-session' } } }
+  const live = new Map([[root.id, root], [mid.id, mid]])
+  host.services.agents = { get: (id) => live.get(id) }
+  for (const plugin of [bilibiliPlugin, reportPlugin]) plugin.apply(host.ctx, {})
+  const signal = new AbortController().signal
+
+  const leaf = { id: 'leaf-session', session: { header: { parentSession: 'mid-session' } } }
+  await host.tools.get('bilibili_search').execute({ keyword: 'a' }, { agent: leaf, signal })
+  const save = () => host.tools.get('save_video_report').execute(
+    { keyword: 'a', summary: 's', picks: [{ url: 'https://www.bilibili.com/video/BV1if4y147hS', reason: 'r' }] },
+    { agent: root, signal },
+  )
+  assert.equal((await save()).candidateCount, 5, '子 Agent 的检索记到了根 Agent 的任务上')
+
+  clearRuns()
+  live.delete(mid.id)
+  await host.tools.get('bilibili_search').execute({ keyword: 'a' }, { agent: leaf, signal })
+  assert.equal((await save()).candidateCount, 0, '中间一层下线后，只能归到它的父会话 mid，而不是 root')
+  const direct = { id: 'child', session: { header: { parentSession: 'root-session' } } }
+  await host.tools.get('bilibili_search').execute({ keyword: 'a' }, { agent: direct, signal })
+  assert.equal((await save()).candidateCount, 5, '直接子 Agent 不依赖 agents 服务也能归到根')
+}))
+
 test('宿主没有 subagents / workingDirectory 服务时也能工作', () => withSites(async (cwd) => {
   const host = fakeHost()
   delete host.services.subagents
