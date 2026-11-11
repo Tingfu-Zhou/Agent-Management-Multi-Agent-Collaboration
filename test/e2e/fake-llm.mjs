@@ -42,7 +42,9 @@ function searchAgent(request, toolName, label) {
   const last = results.at(-1)
   const output = textOf(last.content)
   if (last.is_error) return { text: `${label} 检索失败：${output}` }
-  return { text: `${label} 检索结果汇报\n\n${output}\n\n本平台首选：第 1 个，与关键词最相关。` }
+  // 工具返回 5 条，只挑前 4 条上报 —— 模拟真实子 Agent「检索到的比汇报的多」
+  const [, ...items] = output.split(/\n\n(?=\d+\. )/)
+  return { text: `${label} 检索结果汇报\n\n${items.slice(0, 4).join('\n\n')}\n\n本平台首选：第 1 个，与关键词最相关。` }
 }
 
 /** 管理 Agent：按人设里的 8 个步骤往下走，走到哪一步完全由对话历史决定。 */

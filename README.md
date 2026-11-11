@@ -21,9 +21,13 @@ flowchart TD
     M -- "③ 选出 1–2 个，写成文档" --> D([带链接的推荐文档])
 ```
 
+实际运行的样子（DeepSeek-V4.1-Flash，真实的 B 站和 YouTube 数据）——标题栏里能看到管理 Agent 派出的 2 个子智能体，下方是它的结论和交付的文档：
+
+![管理 Agent 派出两个子智能体，汇总后给出推荐并交付文档](docs/screenshot-result.png)
+
 ## 安装
 
-需要先有 DSH（要求 Node ≥ 24.9）和一个能用的模型（DeepSeek API Key 或账号登录，在 DSH 的设置里配置）。
+需要先有 DSH（要求 Node ≥ 24.9）和一个能用的模型：在 DSH 的设置里登录 DeepSeek 账号或填 API Key，或者启动前导出 `DEEPSEEK_API_KEY`。
 
 ```bash
 npm i -g @deepseek-ai/dsh
@@ -43,7 +47,7 @@ dsh web
 
 插件是纯 JavaScript、零依赖，安装时不需要构建，也不需要给任何脚本授权。卸载：`dsh plugin --profile web remove dsh-video-scout`。
 
-> 用桌面版 DSH 的话，把 `--profile web` 换成 `--profile desktop`（桌面版我没有实测，下面的验证都是在 `web` 上做的）。
+> 用桌面版 DSH 的话，把 `--profile web` 换成 `--profile desktop`。桌面版没有实测，下面的验证都是在 `web` 上做的。
 
 ## 使用
 
@@ -51,13 +55,19 @@ dsh web
 2. 在输入框上方的模式菜单里选 **视频侦察 Video Scout**。
 3. 输入关键词，比如 `机器学习入门`，发送。
 
-接下来你会看到管理 Agent 派出 2 个子智能体，两份汇报回来之后给出结论，并在对话里附上文档。文档保存在 `<工作区>/video-scout/<关键词>-<时间>.md`，长这样（[完整示例](docs/sample-report.md)）：
+<img src="docs/screenshot-presets.png" alt="模式菜单里的三个预设" width="520">
+
+接下来你会看到管理 Agent 派出 2 个子智能体，两份汇报回来之后给出结论，并在对话里附上文档。整个过程一分钟左右。菜单里的 **B 站检索 Agent** 和 **YouTube 检索 Agent** 就是那两个子 Agent，也可以单独拿来用。
+
+文档保存在 `<工作区>/video-scout/<关键词>-<时间>.md`。下面是一次真实运行生成的文档的开头（[完整文档](docs/sample-report.md)）：
 
 ```markdown
 # 「机器学习入门」视频推荐
 
+> 两个检索 Agent 的工作：哔哩哔哩检索到 10 个、汇报 5 个；YouTube 检索到 10 个、汇报 5 个。管理 Agent 从中精选出 2 个。
+
 ## 综合结论
-B 站的结果以系统的中文课程为主，YouTube 的结果讲解更直观；两边各取相关度最高的一个。
+（管理 Agent 写的：两个平台的结果各有什么特点、为什么选这两个）
 
 ## 推荐视频
 ### 1. [【官方中英】2025年公认最好的【吴恩达机器学习课程】…](https://www.bilibili.com/video/BV1owrpYKEtP)
@@ -67,11 +77,9 @@ B 站的结果以系统的中文课程为主，YouTube 的结果讲解更直观�
 - **推荐理由**：…
 - **链接**：<https://www.bilibili.com/video/BV1owrpYKEtP>
 
-## 全部候选
-（两个平台各自检索到的视频对照表，⭐ 为最终推荐）
+## 候选对照
+（两个检索 Agent 各自汇报的 5 个视频，⭐ 为最终推荐）
 ```
-
-菜单里还会多出 **B 站检索 Agent** 和 **YouTube 检索 Agent** 两个模式，它们就是那两个子 Agent，也可以单独拿来用。
 
 ### 可选配置
 
@@ -96,7 +104,7 @@ DSH 里一个「预设」就是一个 Agent 的配方：人设 + 它能用的工
 | `video-scout-bilibili` | 只负责 B 站的检索员 | `bilibili_search` |
 | `video-scout-youtube` | 只负责 YouTube 的检索员 | `youtube_search` |
 
-「管理」关系靠 DSH 自带的委派工具实现：管理 Agent 的预设里挂了两个 `@deepseek-ai/dsh-tool-subagent`，一个绑定 B 站预设，一个绑定 YouTube 预设。管理 Agent 调用 `bilibili_agent` 时，DSH 按绑定的预设新建一个子 Agent——独立的上下文、独立的人设、只有自己那一个工具。子 Agent 干完，DSH 把它的最终答复作为通知送回管理 Agent。
+「管理」关系靠 DSH 自带的委派工具实现：管理 Agent 的预设里挂了两个 `@deepseek-ai/dsh-tool-subagent`，一个绑定 B 站预设，一个绑定 YouTube 预设。管理 Agent 调用 `bilibili_agent` 时，DSH 按绑定的预设新建一个子 Agent——独立的上下文、独立的人设、只有自己那一个检索工具。子 Agent 干完，DSH 把它的最终答复作为通知送回管理 Agent。
 
 工具是隔离的：管理 Agent 没有检索工具，想自己搜也搜不了；检索 Agent 没有委派和写文档的工具，只能检索和汇报。
 
@@ -136,6 +144,8 @@ sequenceDiagram
 
 **模型做决定，事实由代码兜底。** 子 Agent 用自然语言汇报，管理 Agent 再转述进文档——这一来一回里，模型可能把链接抄错，甚至编一个。所以检索工具每次返回结果时都在进程里登记一份（[`lib/run-store.js`](lib/run-store.js)），`save_video_report` 只接受登记过的链接，标题、作者、播放量也一律用登记的数据。管理 Agent 只需要说「选哪个、为什么」。传一个没检索到过的链接，工具会拒绝并列出可选项；「最多 2 个」这条要求也是工具里强制的，不只是写在人设里。
 
+**文档如实记录每个 Agent 做了什么。** 子 Agent 结束时，DSH 会发出一个带着它最终答复的事件；插件据此记下它汇报了哪几个视频。于是文档开头能写出「检索到 10 个、汇报 5 个、精选出 2 个」，候选对照表列的也正是子 Agent 汇报的那几个，而不是检索接口返回的全部。
+
 **并行分派，异步等待。** 两个子 Agent 同时出发。管理 Agent 分派后就结束这一轮，不轮询；哪个子 Agent 先完成，它的汇报就先把管理 Agent 唤醒，两份到齐再做决定。
 
 **一个平台失败不拖垮整体。** 检索失败时工具会给出原因和排障建议，子 Agent 如实上报，管理 Agent 基于另一个平台完成推荐，并在文档的备注里说明。
@@ -146,11 +156,14 @@ sequenceDiagram
 
 | 验证 | 怎么跑 | 覆盖 |
 | --- | --- | --- |
-| 单元测试 | `npm test` | 35 个用例，离线。WBI 签名（对官方样例）、两个平台的结果解析、各种失败路径、文档渲染、链接核对 |
+| 单元测试 | `npm test` | 38 个用例，离线。WBI 签名（对官方样例）、两个平台的结果解析、各种失败路径、文档渲染、链接核对 |
 | 端到端测试 | `npm run e2e` | 在**真实的 DSH 0.2.2-rc.1** 里：全新安装 → 启动 → 用浏览器选预设、发关键词 → 检查派出了 2 个子 Agent、三个 Agent 工具各不相同、文档里的链接来自检索记录、文档作为交付物出现在对话里 |
 | 真实站点 | `E2E_REAL_SITES=1 npm run e2e`<br/>`node bin/video-scout.mjs both 机器学习` | 检索工具访问真实的 B 站和 YouTube |
+| 真实模型 | `E2E_REAL_MODEL=1 E2E_REAL_SITES=1 DEEPSEEK_API_KEY=… npm run e2e` | 用 DeepSeek-V4.1-Flash 完整跑了 4 次（3 次「机器学习入门」，1 次英文关键词「how transformers work」），都成功 |
 
-端到端测试里的模型是一个照着人设演的脚本（[`test/e2e/fake-llm.mjs`](test/e2e/fake-llm.mjs)），所以不需要 API Key、结果可复现。它证明的是插件和 DSH 的对接没问题，**不代表真实模型的表现**。
+默认的端到端测试里，模型是一个照着人设演的脚本（[`test/e2e/fake-llm.mjs`](test/e2e/fake-llm.mjs)），所以不需要 API Key、结果可复现。它证明的是插件和 DSH 的对接没问题，不代表真实模型的表现。
+
+真实模型的 4 次运行里，从会话日志看行为一致：管理 Agent 在同一步里同时调用两个委派工具；每个检索 Agent 检索 1–2 次，再挑出 5 个汇报（汇报数量从第 2 次运行起才有记录）；管理 Agent 等两份汇报到齐后推荐 2 个，调用 `save_video_report` 和 `present` 各一次，没有工具报错。界面显示的用量：管理 Agent 的会话每次约 2.7–2.8 万 token，两个子 Agent 各 5 千左右。4 次不算多，换别的模型或关键词时表现可能不同。
 
 本地目录、`npm pack` 的压缩包、`github:` 三种安装方式都用端到端测试跑通过。
 
@@ -178,6 +191,7 @@ test/                   单元测试、夹具、端到端测试
 - **YouTube 需要能访问。** 国内网络要配 `HTTPS_PROXY`。
 - **YouTube 不能按发布时间排序。** 网页端已经不支持，所以 `youtube_search` 只提供「综合」和「播放量」两种排序。
 - **检索记录只在内存里。** 任务跑到一半重启 DSH，管理 Agent 再保存文档时对不上记录；工具会放行格式合法的链接，但在文档里标注「未核对」。
+- **检索 Agent 还能看到一个 `working_directory` 工具。** 它是 DSH 全局注册的，不属于这个插件；实测中模型没有去用它。
 - **只在 DSH 0.2.2-rc.1 的 `web` profile 上测过。** DSH 还在预览阶段，接口可能变；`package.json` 里的 `engines.dsh` 据此限定了版本范围。
 - 检索用的是两个站点的网页端接口，不是官方开放 API（YouTube 配了 Key 时除外），站点改版可能导致失效。请只用于个人学习和演示。
 

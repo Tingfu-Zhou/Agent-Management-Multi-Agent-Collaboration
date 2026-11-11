@@ -21,11 +21,13 @@ function fakeHost() {
     subagents: { rootOf: (agent) => agent.root ?? agent },
     workingDirectory: { ensure: async (agent) => agent.cwd },
   }
+  const listeners = new Map()
   const ctx = {
     tools: { register: (definition) => { tools.set(definition.name, definition); return () => tools.delete(definition.name) } },
     get: (name) => services[name],
+    on: (event, listener) => { listeners.set(event, listener); return () => listeners.delete(event) },
   }
-  return { ctx, tools, services }
+  return { ctx, tools, services, emit: (event, payload) => listeners.get(event)?.(payload) }
 }
 
 async function withSites(run) {
@@ -106,13 +108,45 @@ test('完整链路：两个子 Agent 检索 → 管理 Agent 保存文档', () =
   assert.match(path.basename(value.path), /^机器学习-\d{8}-\d{6}\.md$/)
   assert.equal(value.candidateCount, 9)
   assert.deepEqual(value.picks.map((p) => p.platform), ['youtube', 'bilibili'])
-  assert.match(textOf(save, args, value), /推荐文档已保存：.*\n（收录推荐 2 个，候选对照 9 个）[\s\S]*下一步：调用 present/)
+  assert.equal(value.listedCount, 9, '没有汇报记录时，对照表列出检索到的全部')
+  assert.match(textOf(save, args, value), /推荐文档已保存：.*\n（文档里有 2 个推荐，以及 9 个候选的对照表；两个平台共检索到 9 个视频）[\s\S]*下一步：调用 present/)
 
   const doc = await readFile(value.path, 'utf8')
   assert.match(doc, /### 1\. \[But what is a neural network\? \\\| Deep learning chapter 1\]\(https:\/\/www\.youtube\.com\/watch\?v=aircAruvnKk\)/)
   assert.match(doc, /### 2\. \[\(强推\\\|双字\)2022吴恩达机器学习Deeplearning\.ai课程\]\(https:\/\/www\.bilibili\.com\/video\/BV1Pa411X76s\)/)
   assert.match(doc, /### 哔哩哔哩\n[\s\S]*### YouTube\n/)
   assert.equal((doc.match(/⭐/g) ?? []).length, 3, '说明行 1 个 + 两个推荐各 1 个')
+}))
+
+test('子 Agent 结束时记下它汇报了哪些视频，文档的候选表只列这些', () => withSites(async (cwd) => {
+  const host = fakeHost()
+  for (const plugin of [bilibiliPlugin, youtubePlugin, reportPlugin]) plugin.apply(host.ctx, {})
+  const manager = { id: 'session-root', cwd }
+  const signal = new AbortController().signal
+  await host.tools.get('bilibili_search').execute({ keyword: '机器学习', limit: 6 }, { agent: { id: 'child-b', root: manager }, signal })
+  await host.tools.get('youtube_search').execute({ keyword: 'ml' }, { agent: { id: 'child-y', root: manager }, signal })
+
+  // DSH 发出的 subagent/end：子 Agent 的会话 id + 它的最终答复
+  host.emit('subagent/end', { id: 'child-b', stopReason: 'completed', lastAssistantMessage: [
+    { type: 'text', text: 'B 站检索结果\n1. 链接：https://www.bilibili.com/video/BV1if4y147hS\n2. 链接：https://www.bilibili.com/video/BV1Pa411X76s/?spm=1' },
+  ] })
+  host.emit('subagent/end', { id: 'child-y', lastAssistantMessage: [{ type: 'thinking', thinking: 'aircAruvnKk' }, { type: 'text', text: 'https://youtu.be/i_LwzRVP7bg' }] })
+  host.emit('subagent/end', { id: 'someone-else', lastAssistantMessage: [{ type: 'text', text: 'BV1bx411M7Zx' }] })
+  host.emit('subagent/end', { id: 'child-b' }) // 没有最终答复（例如被取消）：不应报错
+
+  const value = await host.tools.get('save_video_report').execute(
+    { keyword: '机器学习', summary: 's', picks: [{ url: 'https://www.bilibili.com/video/BV1if4y147hS', reason: 'r' }] },
+    { agent: manager, signal },
+  )
+  assert.equal(value.candidateCount, 11, '检索到的总数不变')
+  assert.equal(value.listedCount, 3, '对照表只列被汇报的')
+  const doc = await readFile(value.path, 'utf8')
+  assert.match(doc, /哔哩哔哩检索到 6 个、汇报 2 个；YouTube 检索到 5 个、汇报 1 个。管理 Agent 从中精选出 1 个。/)
+  const rows = doc.match(/^\| \d+ \| .*$/gm)
+  assert.equal(rows.length, 3)
+  assert.match(rows[0], /⭐ .*BV1if4y147hS/)
+  assert.match(rows[1], /BV1Pa411X76s/)
+  assert.match(rows[2], /i_LwzRVP7bg/, '只认文本块里提到的视频，思考块不算')
 }))
 
 test('不同任务（不同的根 Agent）之间不共享检索记录', () => withSites(async (cwd) => {

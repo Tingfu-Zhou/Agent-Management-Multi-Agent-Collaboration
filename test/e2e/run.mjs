@@ -196,6 +196,13 @@ try {
   await shot('2-result')
   const body = await bodyText()
   ok('管理 Agent 给出了最终答复')
+  if (shots) {
+    // 顺手截一张子智能体列表（点开标题栏的「2 个子智能体」）；截不到不算失败
+    await page.getByText(/\d+ 个子智能体/).first().click({ timeout: 5000 }).catch(() => {})
+    await page.waitForTimeout(800)
+    await shot('3-subagents')
+    await page.keyboard.press('Escape').catch(() => {})
+  }
 
   step('检查结果')
   assert.match(body, /2 个子智能体/, '界面应显示管理 Agent 派出了 2 个子智能体')
@@ -229,7 +236,8 @@ try {
   assert.match(report, /^# 「.+」视频推荐/)
   const picks = [...report.matchAll(/^### \d+\. \[.+\]\((https:\/\/www\.(?:bilibili\.com\/video\/BV[0-9A-Za-z]{10}|youtube\.com\/watch\?v=[\w-]{11}))\)$/gm)].map((match) => match[1])
   assert.ok(picks.length >= 1 && picks.length <= 2, `文档应当推荐 1–2 个视频，实际 ${picks.length} 个`)
-  assert.match(report, /从哔哩哔哩 \d+ 个、YouTube \d+ 个候选里精选出 [12] 个/)
+  // 子 Agent 汇报的比检索到的少时，开头写的是「检索到 N 个、汇报 M 个」；一样多时写「从 … 候选里精选出」
+  assert.match(report, /哔哩哔哩检索到 \d+ 个、汇报 \d+ 个；YouTube 检索到 \d+ 个、汇报 \d+ 个。管理 Agent 从中精选出 [12] 个|从哔哩哔哩 \d+ 个、YouTube \d+ 个候选里精选出 [12] 个/)
   assert.ok(!report.includes('没有对上检索记录'), '子 Agent 的检索记录应当能被管理 Agent 的写文档工具查到')
   if (!REAL_MODEL) {
     // 假模型固定各取一个：第 1 个来自 B 站，第 2 个来自 YouTube
@@ -241,9 +249,12 @@ try {
     // 假视频站的内容是固定的，可以精确核对标题与链接
     assert.match(report, /### 1\. \[【机器学习】动手学深度学习 \\\| 00 预告 & 课程安排\]\(https:\/\/www\.bilibili\.com\/video\/BV1if4y147hS\)/)
     assert.match(report, /### 2\. \[But what is a neural network\? \\\| Deep learning chapter 1\]\(https:\/\/www\.youtube\.com\/watch\?v=aircAruvnKk\)/)
-    assert.match(report, /从哔哩哔哩 5 个、YouTube 5 个候选里精选出 2 个/)
+    // 假模型的子 Agent 各检索到 5 个、只汇报 4 个：DSH 的 subagent/end 事件被插件收到，候选表各列 4 行
+    assert.match(report, /哔哩哔哩检索到 5 个、汇报 4 个；YouTube 检索到 5 个、汇报 4 个。管理 Agent 从中精选出 2 个/)
+    assert.equal((report.match(/^\| \d+ \| /gm) ?? []).length, 8, '候选表应当只列子 Agent 汇报的 4 + 4 个')
+    assert.ok(!report.includes('BV1Wv411h7kN') && !report.includes('LIVEstrm00A'), '没被汇报的第 5 个不应出现在文档里')
   }
-  ok(`文档 ${reports[0]}：推荐了 ${picks.length} 个视频，标题、链接都来自检索记录，并附全部候选的对照表`)
+  ok(`文档 ${reports[0]}：推荐了 ${picks.length} 个视频，标题、链接都来自检索记录，并附子 Agent 所汇报视频的对照表`)
 
   assert.ok(body.includes(reports[0]), '文档应当作为交付物出现在界面上')
   ok('文档作为交付物出现在对话里')

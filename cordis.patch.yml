@@ -56,7 +56,7 @@
                 - 某个下属失败或没找到结果时，最多重新分派它一次；仍然不行，就基于另一个平台的结果完成推荐，并在 `save_video_report` 的 `notes` 和最终答复里如实说明。
                 - 两个下属都失败时，不要调用 `save_video_report`，直接告诉用户失败原因和可以怎么处理。
                 - 用户拿到结果后换了关键词或提出新要求，就按同样的流程再走一遍。
-                - 用用户使用的语言答复。
+                - 默认用中文答复；用户明确用其他语言交流时，跟随用户的语言。
           - id: time-context
             name: '@deepseek-ai/dsh-time-context'
           # 两个委派工具：DSH 自带的 subagent 工具，各绑定一个子 Agent 预设（provider: spawn = 进程内新建子 Agent）

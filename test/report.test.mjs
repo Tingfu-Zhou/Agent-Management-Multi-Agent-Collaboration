@@ -76,13 +76,36 @@ test('渲染出的文档包含推荐、链接、理由和全部候选对照表',
   assert.ok(!doc.includes('没有对上检索记录'))
 })
 
+test('有汇报记录时：开头写明「检索到 → 汇报 → 精选」，候选表只列被汇报的和被推荐的', () => {
+  const B3 = { ...B2, id: 'BV1Mh411e7VU', url: 'https://www.bilibili.com/video/BV1Mh411e7VU', title: '没被汇报的视频' }
+  const all = new Map([['bilibili', [B1, B2, B3]], ['youtube', [Y1]]])
+  // B 站检索到 3 个，子 Agent 只汇报了 B1；管理 Agent 却推荐了 B2（没被汇报但检索到过）
+  const { picks } = resolvePicks([{ url: B2.url, reason: 'r' }], all)
+  const doc = renderReport({ keyword: 'k', summary: 's', picks, candidates: all, reported: new Set([B1.url, Y1.url]), date: new Date(2026, 0, 2) })
+  assert.match(doc, /两个检索 Agent 的工作：哔哩哔哩检索到 3 个、汇报 2 个；YouTube 检索到 1 个、汇报 1 个。管理 Agent 从中精选出 1 个。/)
+  assert.match(doc, /## 候选对照\n\n两个检索 Agent 汇报的视频，⭐ 为最终推荐。/)
+  assert.match(doc, /\| 1 \| \[【机器学习】动手学深度学习 \\\| 00 预告\]/)
+  assert.match(doc, /\| 2 \| ⭐ \[2022吴恩达机器学习\]/)
+  assert.ok(!doc.includes('没被汇报的视频'))
+})
+
+test('没有汇报记录（或汇报的就是全部）时，沿用「从 … 候选里精选出」的写法并列出全部', () => {
+  const { picks } = resolvePicks([{ url: B1.url, reason: 'r' }], candidates())
+  for (const reported of [new Set(), new Set([B1.url, B2.url, Y1.url])]) {
+    const doc = renderReport({ keyword: 'k', summary: 's', picks, candidates: candidates(), reported, date: new Date(2026, 0, 2) })
+    assert.match(doc, /从哔哩哔哩 2 个、YouTube 1 个候选里精选出 1 个/)
+    assert.match(doc, /两个检索 Agent 找到的视频，⭐ 为最终推荐。/)
+    assert.equal((doc.match(/^\| \d+ \| /gm) ?? []).length, 3)
+  }
+})
+
 test('备注、未核对标记、没有候选时的版式', () => {
   const { picks } = resolvePicks([{ url: Y1.url, reason: 'r' }], new Map())
   const doc = renderReport({ keyword: 'k', summary: '', picks, candidates: new Map(), notes: 'B 站检索失败：风控', date: new Date(2026, 0, 2, 3, 4, 5) })
   assert.match(doc, /综合 B 站、YouTube 两个检索 Agent 的汇报，精选出 1 个/)
   assert.match(doc, /## 综合结论\n\n（无）/)
   assert.match(doc, /没有对上检索记录/)
-  assert.ok(!doc.includes('## 全部候选'))
+  assert.ok(!doc.includes('## 候选对照'))
   assert.match(doc, /## 备注\n\nB 站检索失败：风控\n$/)
 })
 
